@@ -90,6 +90,111 @@ describe('FocusScope', () => {
     });
   });
 
+  describe('given an initially focused container', () => {
+    it.each([false, true])(
+      'enters at the last tabbable on shift+tab when looped and trapped=%s',
+      async (trapped) => {
+        const containerRef = React.createRef<HTMLDivElement>();
+        const rendered = render(
+          <FocusScope.Root
+            ref={containerRef}
+            loop
+            trapped={trapped}
+            onMountAutoFocus={(event) => {
+              event.preventDefault();
+              containerRef.current?.focus();
+            }}
+          >
+            <button>First</button>
+            <button>Last</button>
+          </FocusScope.Root>,
+        );
+
+        expect(containerRef.current).toHaveFocus();
+        await userEvent.tab({ shift: true });
+        expect(rendered.getByText('Last')).toHaveFocus();
+        await userEvent.tab();
+        expect(rendered.getByText('First')).toHaveFocus();
+      },
+    );
+
+    it('skips disabled and hidden candidates when entering backward', async () => {
+      const containerRef = React.createRef<HTMLDivElement>();
+      const rendered = render(
+        <FocusScope.Root
+          ref={containerRef}
+          loop
+          trapped
+          onMountAutoFocus={(event) => {
+            event.preventDefault();
+            containerRef.current?.focus();
+          }}
+        >
+          <button disabled>Disabled first</button>
+          <button>First</button>
+          <button>Last</button>
+          <button disabled>Disabled last</button>
+          <button hidden>Hidden last</button>
+        </FocusScope.Root>,
+      );
+
+      await userEvent.tab({ shift: true });
+      expect(rendered.getByText('Last')).toHaveFocus();
+    });
+
+    it('prevents reverse escape without looping when trapped', () => {
+      const containerRef = React.createRef<HTMLDivElement>();
+      render(
+        <FocusScope.Root ref={containerRef} trapped>
+          <button>First</button>
+          <button>Last</button>
+        </FocusScope.Root>,
+      );
+      containerRef.current?.focus();
+
+      const notCancelled = fireEvent.keyDown(containerRef.current!, {
+        key: 'Tab',
+        shiftKey: true,
+      });
+      expect(notCancelled).toBe(false);
+      expect(containerRef.current).toHaveFocus();
+    });
+
+    it('does not intercept reverse tab when neither looping nor trapped', async () => {
+      const containerRef = React.createRef<HTMLDivElement>();
+      const rendered = render(
+        <div>
+          <button>Before</button>
+          <FocusScope.Root ref={containerRef}>
+            <button>First</button>
+            <button>Last</button>
+          </FocusScope.Root>
+          <button>After</button>
+        </div>,
+      );
+      containerRef.current?.focus();
+
+      await userEvent.tab({ shift: true });
+      expect(rendered.getByText('Before')).toHaveFocus();
+    });
+
+    it.each([false, true])(
+      'keeps an empty trapped container focused for shift=%s',
+      async (shift) => {
+        const containerRef = React.createRef<HTMLDivElement>();
+        render(
+          <FocusScope.Root ref={containerRef} loop trapped>
+            <button disabled>Disabled</button>
+          </FocusScope.Root>,
+        );
+        expect(containerRef.current).toHaveFocus();
+
+        await userEvent.tab({ shift });
+        expect(containerRef.current).toHaveFocus();
+      },
+    );
+  });
+
   describe('given a FocusScope where the first focusable has a negative tabindex', () => {
     let rendered: RenderResult;
     let tabbableSecond: HTMLInputElement;
@@ -189,6 +294,144 @@ describe('FocusScope', () => {
       await userEvent.tab({ shift: true });
       await userEvent.tab();
       await waitFor(() => expect(handleLastFocusableElementBlur).toHaveBeenCalledTimes(1));
+    });
+  });
+
+  describe('given disabled fieldsets', () => {
+    it.each(['container', 'first'])(
+      'skips inherited disabled controls when reverse-tabbing from %s',
+      async (start) => {
+        const ref = React.createRef<HTMLDivElement>();
+        const rendered = render(
+          <FocusScope.Root ref={ref} loop trapped>
+            <button>First active</button>
+            <button>Last active</button>
+            <fieldset disabled>
+              <legend>Group</legend>
+              <input aria-label="Inherited disabled" />
+            </fieldset>
+          </FocusScope.Root>,
+        );
+        (start === 'container' ? ref.current : rendered.getByText('First active'))?.focus();
+
+        await userEvent.tab({ shift: true });
+        expect(rendered.getByText('Last active')).toHaveFocus();
+      },
+    );
+
+    it('retains the first legend exception but excludes explicitly disabled and inherited controls', async () => {
+      const ref = React.createRef<HTMLDivElement>();
+      const rendered = render(
+        <FocusScope.Root ref={ref} loop trapped>
+          <button>First active</button>
+          <fieldset disabled>
+            <legend>
+              <input aria-label="Legend active" />
+              <input aria-label="Legend explicitly disabled" disabled />
+            </legend>
+            <input aria-label="Inherited disabled" />
+          </fieldset>
+        </FocusScope.Root>,
+      );
+      ref.current?.focus();
+
+      await userEvent.tab({ shift: true });
+      expect(rendered.getByLabelText('Legend active')).toHaveFocus();
+      expect(rendered.getByLabelText('Legend explicitly disabled')).toBeDisabled();
+      expect(rendered.getByLabelText('Inherited disabled')).toBeDisabled();
+    });
+
+    it.each(['container', 'first'])(
+      'recomputes enabled fieldset edges after each transition from %s',
+      async (start) => {
+        const ref = React.createRef<HTMLDivElement>();
+        const fields = (disabled: boolean) => (
+          <FocusScope.Root ref={ref} loop trapped>
+            <button>First active</button>
+            <button>Last active</button>
+            <fieldset disabled={disabled}>
+              <legend>Group</legend>
+              <input aria-label="Group control" />
+            </fieldset>
+          </FocusScope.Root>
+        );
+        const rendered = render(fields(false));
+        (start === 'container' ? ref.current : rendered.getByText('First active'))?.focus();
+        await userEvent.tab({ shift: true });
+        expect(rendered.getByLabelText('Group control')).toHaveFocus();
+
+        rendered.rerender(fields(true));
+        (start === 'container' ? ref.current : rendered.getByText('First active'))?.focus();
+        await userEvent.tab({ shift: true });
+        expect(rendered.getByText('Last active')).toHaveFocus();
+
+        rendered.rerender(fields(false));
+        (start === 'container' ? ref.current : rendered.getByText('First active'))?.focus();
+        await userEvent.tab({ shift: true });
+        expect(rendered.getByLabelText('Group control')).toHaveFocus();
+      },
+    );
+
+    it('applies an outer disabled fieldset to a nested fieldset first legend', async () => {
+      const ref = React.createRef<HTMLDivElement>();
+      const rendered = render(
+        <FocusScope.Root ref={ref} loop trapped>
+          <button>First active</button>
+          <fieldset disabled>
+            <legend>
+              <input aria-label="Outer legend active" />
+            </legend>
+            <fieldset disabled>
+              <legend>
+                <input aria-label="Inner legend inherited disabled" />
+              </legend>
+              <input aria-label="Inner inherited disabled" />
+            </fieldset>
+          </fieldset>
+        </FocusScope.Root>,
+      );
+      ref.current?.focus();
+      await userEvent.tab({ shift: true });
+      expect(rendered.getByLabelText('Outer legend active')).toHaveFocus();
+    });
+
+    it('keeps links inside disabled fieldsets tabbable', async () => {
+      const ref = React.createRef<HTMLDivElement>();
+      const rendered = render(
+        <FocusScope.Root ref={ref} loop trapped>
+          <button>First active</button>
+          <fieldset disabled>
+            <legend>Group</legend>
+            <input aria-label="Inherited disabled" />
+            <a href="#destination">Enabled link</a>
+          </fieldset>
+        </FocusScope.Root>,
+      );
+      ref.current?.focus();
+      await userEvent.tab({ shift: true });
+      expect(rendered.getByText('Enabled link')).toHaveFocus();
+    });
+
+    it.each([
+      { isComposing: true },
+      { keyCode: 229 },
+      { altKey: true },
+      { ctrlKey: true },
+      { metaKey: true },
+    ])('does not intercept an IME or modified Tab from the container: %j', (keys) => {
+      const ref = React.createRef<HTMLDivElement>();
+      render(
+        <FocusScope.Root ref={ref} loop trapped>
+          <button>First active</button>
+          <fieldset disabled>
+            <input />
+          </fieldset>
+        </FocusScope.Root>,
+      );
+      ref.current?.focus();
+      const notCancelled = fireEvent.keyDown(ref.current!, { key: 'Tab', shiftKey: true, ...keys });
+      expect(notCancelled).toBe(true);
+      expect(ref.current).toHaveFocus();
     });
   });
 

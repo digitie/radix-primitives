@@ -1,0 +1,49 @@
+name: Patched FocusScope regression and artifact
+on:
+  push:
+    branches: [agent/fix-focus-scope-container-reverse-entry]
+  pull_request:
+    paths:
+      - 'packages/react/focus-scope/**'
+      - 'apps/storybook/stories/focus-scope.stories.tsx'
+      - 'e2e/focus-scope.spec.ts'
+      - 'e2e/focus-scope-fieldset.spec.ts'
+      - 'scripts/create-focus-scope-fix.mjs'
+      - 'scripts/pack-focus-scope-fix.mjs'
+      - 'scripts/verify-focus-scope-fix.mjs'
+      - 'patches/focus-scope-fix2/**'
+      - '.github/workflows/focus-scope-fix.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.2'
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @radix-ui/react-focus-scope... build
+      - run: pnpm --filter @radix-ui/react-focus-scope lint
+      - run: pnpm --filter @radix-ui/react-focus-scope typecheck
+      - run: pnpm exec oxfmt --check packages/react/focus-scope/src/focus-scope.tsx packages/react/focus-scope/src/focus-scope.test.tsx apps/storybook/stories/focus-scope.stories.tsx e2e/focus-scope.spec.ts e2e/focus-scope-fieldset.spec.ts scripts/pack-focus-scope-fix.mjs scripts/create-focus-scope-fix.mjs scripts/verify-focus-scope-fix.mjs
+      - run: pnpm exec vitest run packages/react/focus-scope --retry 0
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright test e2e/focus-scope.spec.ts e2e/focus-scope-fieldset.spec.ts --workers=1
+      - run: pnpm --filter @radix-ui/react-focus-scope build
+      - name: Verify and copy the single frozen fix.2 payload
+        run: node scripts/pack-focus-scope-fix.mjs /tmp/focus-scope-fix2-artifacts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: focus-scope-regression-and-package
+          path: |
+            /tmp/focus-scope-fix2-artifacts
+            playwright-report
+            test-results
