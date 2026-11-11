@@ -90,6 +90,111 @@ describe('FocusScope', () => {
     });
   });
 
+  describe('given an initially focused container', () => {
+    it.each([false, true])(
+      'enters at the last tabbable on shift+tab when looped and trapped=%s',
+      async (trapped) => {
+        const containerRef = React.createRef<HTMLDivElement>();
+        const rendered = render(
+          <FocusScope.Root
+            ref={containerRef}
+            loop
+            trapped={trapped}
+            onMountAutoFocus={(event) => {
+              event.preventDefault();
+              containerRef.current?.focus();
+            }}
+          >
+            <button>First</button>
+            <button>Last</button>
+          </FocusScope.Root>,
+        );
+
+        expect(containerRef.current).toHaveFocus();
+        await userEvent.tab({ shift: true });
+        expect(rendered.getByText('Last')).toHaveFocus();
+        await userEvent.tab();
+        expect(rendered.getByText('First')).toHaveFocus();
+      },
+    );
+
+    it('skips disabled and hidden candidates when entering backward', async () => {
+      const containerRef = React.createRef<HTMLDivElement>();
+      const rendered = render(
+        <FocusScope.Root
+          ref={containerRef}
+          loop
+          trapped
+          onMountAutoFocus={(event) => {
+            event.preventDefault();
+            containerRef.current?.focus();
+          }}
+        >
+          <button disabled>Disabled first</button>
+          <button>First</button>
+          <button>Last</button>
+          <button disabled>Disabled last</button>
+          <button hidden>Hidden last</button>
+        </FocusScope.Root>,
+      );
+
+      await userEvent.tab({ shift: true });
+      expect(rendered.getByText('Last')).toHaveFocus();
+    });
+
+    it('prevents reverse escape without looping when trapped', () => {
+      const containerRef = React.createRef<HTMLDivElement>();
+      render(
+        <FocusScope.Root ref={containerRef} trapped>
+          <button>First</button>
+          <button>Last</button>
+        </FocusScope.Root>,
+      );
+      containerRef.current?.focus();
+
+      const notCancelled = fireEvent.keyDown(containerRef.current!, {
+        key: 'Tab',
+        shiftKey: true,
+      });
+      expect(notCancelled).toBe(false);
+      expect(containerRef.current).toHaveFocus();
+    });
+
+    it('does not intercept reverse tab when neither looping nor trapped', async () => {
+      const containerRef = React.createRef<HTMLDivElement>();
+      const rendered = render(
+        <div>
+          <button>Before</button>
+          <FocusScope.Root ref={containerRef}>
+            <button>First</button>
+            <button>Last</button>
+          </FocusScope.Root>
+          <button>After</button>
+        </div>,
+      );
+      containerRef.current?.focus();
+
+      await userEvent.tab({ shift: true });
+      expect(rendered.getByText('Before')).toHaveFocus();
+    });
+
+    it.each([false, true])(
+      'keeps an empty trapped container focused for shift=%s',
+      async (shift) => {
+        const containerRef = React.createRef<HTMLDivElement>();
+        render(
+          <FocusScope.Root ref={containerRef} loop trapped>
+            <button disabled>Disabled</button>
+          </FocusScope.Root>,
+        );
+        expect(containerRef.current).toHaveFocus();
+
+        await userEvent.tab({ shift });
+        expect(containerRef.current).toHaveFocus();
+      },
+    );
+  });
+
   describe('given a FocusScope where the first focusable has a negative tabindex', () => {
     let rendered: RenderResult;
     let tabbableSecond: HTMLInputElement;

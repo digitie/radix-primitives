@@ -231,7 +231,10 @@ const FocusScope = /* @__PURE__ */ React.forwardRef<FocusScopeElement, FocusScop
             if (!event.shiftKey && focusedElement === last) {
               event.preventDefault();
               if (loop) focus(first, { select: true });
-            } else if (event.shiftKey && focusedElement === first) {
+            } else if (
+              event.shiftKey &&
+              (focusedElement === first || focusedElement === container)
+            ) {
               event.preventDefault();
               if (loop) focus(last, { select: true });
             }

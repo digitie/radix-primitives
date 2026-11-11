@@ -1,0 +1,40 @@
+name: Patched FocusScope regression and artifact
+on:
+  push:
+    branches: [agent/fix-focus-scope-container-reverse-entry]
+  pull_request:
+    paths:
+      - 'packages/react/focus-scope/**'
+      - 'apps/storybook/stories/focus-scope.stories.tsx'
+      - 'e2e/focus-scope.spec.ts'
+      - 'scripts/pack-focus-scope-fix.mjs'
+      - '.github/workflows/focus-scope-fix.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @radix-ui/react-focus-scope... build
+      - run: pnpm --filter @radix-ui/react-focus-scope lint
+      - run: pnpm --filter @radix-ui/react-focus-scope typecheck
+      - run: pnpm exec oxfmt --check packages/react/focus-scope/src/focus-scope.tsx packages/react/focus-scope/src/focus-scope.test.tsx apps/storybook/stories/focus-scope.stories.tsx e2e/focus-scope.spec.ts scripts/pack-focus-scope-fix.mjs
+      - run: pnpm exec vitest run packages/react/focus-scope --retry 0
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright test e2e/focus-scope.spec.ts --workers=1
+      - run: node scripts/pack-focus-scope-fix.mjs /tmp/focus-scope-artifacts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: focus-scope-regression-and-package
+          path: |
+            /tmp/focus-scope-artifacts
+            playwright-report
+            test-results

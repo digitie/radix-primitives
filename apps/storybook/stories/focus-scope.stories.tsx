@@ -262,3 +262,103 @@ export const WithOptions = () => {
     </div>
   );
 };
+
+export const ContainerEntry = () => {
+  const [loop, setLoop] = React.useState(true);
+  const [trapped, setTrapped] = React.useState(true);
+  const [empty, setEmpty] = React.useState(false);
+  const [disabledEdges, setDisabledEdges] = React.useState(false);
+  const [focusFirst, setFocusFirst] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
+  const [nested, setNested] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const nestedRef = React.useRef<HTMLDivElement>(null);
+  const firstRef = React.useRef<HTMLButtonElement>(null);
+
+  return (
+    <>
+      <label>
+        <input type="checkbox" checked={loop} onChange={(event) => setLoop(event.target.checked)} />
+        Loop
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          checked={trapped}
+          onChange={(event) => setTrapped(event.target.checked)}
+        />
+        Trapped
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          checked={empty}
+          onChange={(event) => setEmpty(event.target.checked)}
+        />
+        Empty
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          checked={disabledEdges}
+          onChange={(event) => setDisabledEdges(event.target.checked)}
+        />
+        Disabled edges
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          checked={focusFirst}
+          onChange={(event) => setFocusFirst(event.target.checked)}
+        />
+        Focus first
+      </label>
+      <button onClick={() => setOpen(true)}>Open scope</button>
+      {open && (
+        <FocusScope.Root
+          ref={containerRef}
+          data-testid="outer-scope"
+          loop={loop}
+          trapped={trapped}
+          onMountAutoFocus={(event) => {
+            event.preventDefault();
+            if (focusFirst) {
+              firstRef.current?.focus();
+            } else {
+              containerRef.current?.focus();
+            }
+          }}
+        >
+          {disabledEdges && <button disabled>Disabled before</button>}
+          <button ref={firstRef} disabled={empty}>
+            First
+          </button>
+          <button disabled={empty} onClick={() => setNested(true)}>
+            Open nested
+          </button>
+          <button disabled={empty} onClick={() => setOpen(false)}>
+            Last
+          </button>
+          {disabledEdges && <button disabled>Disabled after</button>}
+          <button hidden>Hidden after</button>
+          {nested && (
+            <FocusScope.Root
+              ref={nestedRef}
+              data-testid="inner-scope"
+              loop
+              trapped
+              onMountAutoFocus={(event) => {
+                event.preventDefault();
+                nestedRef.current?.focus();
+              }}
+            >
+              <button>Inner first</button>
+              <button onClick={() => setNested(false)}>Inner last</button>
+            </FocusScope.Root>
+          )}
+        </FocusScope.Root>
+      )}
+      <button>After scope</button>
+    </>
+  );
+};
