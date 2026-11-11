@@ -34,7 +34,14 @@ execFileSync(
 // Always rebuild with the tracked original producer before copying dist.
 execFileSync(
   'corepack',
-  ['pnpm', 'exec', 'node', 'internal/builder/radix-build.js', 'packages/react/focus-scope'],
+  [
+    'pnpm',
+    '--filter',
+    '@radix-ui/react-focus-scope',
+    'exec',
+    'node',
+    '../../../internal/builder/radix-build.js',
+  ],
   {
     cwd: root,
     env: { ...process.env, pnpm_config_verify_deps_before_run: 'false' },

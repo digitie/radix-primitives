@@ -33,7 +33,7 @@ jobs:
       - run: pnpm exec vitest run packages/react/focus-scope --retry 0
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm exec playwright test e2e/focus-scope.spec.ts --workers=1
-      - run: pnpm exec node internal/builder/radix-build.js packages/react/focus-scope
+      - run: pnpm --filter @radix-ui/react-focus-scope build
       - run: node scripts/verify-focus-scope-fix.mjs
       - uses: actions/upload-artifact@v4
         if: always()
