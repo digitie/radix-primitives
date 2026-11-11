@@ -62,7 +62,12 @@ test.describe('FocusScope disabled fieldsets', () => {
     await page.getByRole('button', { name: 'Open fieldset scope', exact: true }).click();
     await page.keyboard.press('Shift+Tab');
     await expect(page.getByLabel('Legend active', { exact: true })).toBeFocused();
-    await expect(page.getByLabel('Inner legend control', { exact: true })).toBeDisabled();
+    // Playwright's nearest-fieldset matcher misses this outer disabled ancestor.
+    // Assert the browser's native state and rejected focus, not a weaker helper result.
+    const innerLegend = page.getByLabel('Inner legend control', { exact: true });
+    expect(await innerLegend.evaluate((element) => element.matches(':disabled'))).toBe(true);
+    await innerLegend.evaluate((element) => (element as HTMLInputElement).focus());
+    await expect(page.getByLabel('Legend active', { exact: true })).toBeFocused();
     await page.getByRole('button', { name: 'Enable fieldset', exact: true }).click();
     await page.getByTestId('fieldset-scope').focus();
     await page.keyboard.press('Shift+Tab');
