@@ -6,21 +6,21 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const frozenRoot = path.join(root, 'patches/focus-scope-fix1');
+const frozenRoot = path.join(root, 'patches/focus-scope-fix2');
 const ledgerPath = path.join(frozenRoot, 'radix-focus-scope-artifact.json');
 if (!fs.existsSync(ledgerPath)) {
-  throw new Error('Frozen fix.1 ledger is required; never re-create this version');
+  throw new Error('Frozen fix.2 ledger is required; never re-create this version');
 }
 const frozen = JSON.parse(fs.readFileSync(ledgerPath, 'utf8'));
 if (
   frozen.patchedPackage?.name !== '@radix-ui/react-focus-scope' ||
-  frozen.patchedPackage?.version !== '1.3.1+kortravel.fix.1'
+  frozen.patchedPackage?.version !== '1.3.1+kortravel.fix.2'
 ) {
   throw new Error('Unexpected frozen package identity');
 }
 const source = path.join(frozenRoot, frozen.filename);
 if (!fs.existsSync(source)) {
-  throw new Error('Frozen fix.1 tarball is required; never re-create this version');
+  throw new Error('Frozen fix.2 tarball is required; never re-create this version');
 }
 execFileSync(
   'git',
@@ -33,7 +33,7 @@ execFileSync(
     'internal/builder',
     'scripts/pack-focus-scope-fix.mjs',
     'scripts/verify-focus-scope-fix.mjs',
-    'patches/focus-scope-fix1',
+    'patches/focus-scope-fix2',
   ],
   { cwd: root, stdio: 'inherit' },
 );

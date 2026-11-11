@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const artifactRoot = path.join(root, 'patches/focus-scope-fix1');
+const artifactRoot = path.join(root, 'patches/focus-scope-fix2');
 const ledger = JSON.parse(
   fs.readFileSync(path.join(artifactRoot, 'radix-focus-scope-artifact.json'), 'utf8'),
 );
@@ -49,23 +49,25 @@ for (const file of [
     throw new Error('Frozen artifact source mismatch: ' + file);
   }
 }
-// The original workspace build runs from the package directory. The frozen
-// producer ran from the root, so esbuild emits different source-path comments.
-// Normalize only those non-executable comments; all other bytes must match.
-/** @param {Buffer} value */
-const normalizeSourcePathComments = (value) =>
-  value.toString('utf8').replace(/^\/\/ (?:packages\/react\/focus-scope\/)?src\//gm, '// source/');
-for (const file of ['index.js', 'index.mjs', 'index.d.ts', 'index.d.mts']) {
+// Producer and CI use the same standard workspace context and pinned toolchain.
+for (const file of [
+  'index.js',
+  'index.mjs',
+  'index.d.ts',
+  'index.d.mts',
+  'index.js.map',
+  'index.mjs.map',
+]) {
   const archived = packed('dist/' + file);
   const rebuilt = fs.readFileSync(path.join(root, 'packages/react/focus-scope/dist', file));
-  const matches =
-    file.endsWith('.js') || file.endsWith('.mjs')
-      ? normalizeSourcePathComments(archived) === normalizeSourcePathComments(rebuilt)
-      : archived.equals(rebuilt);
-  if (!matches) {
-    throw new Error('Frozen artifact differs from original builder output: ' + file);
+  if (
+    !archived.equals(rebuilt) ||
+    createHash('sha256').update(archived).digest('hex') !== provenance.distSha256[file]
+  ) {
+    throw new Error('Frozen artifact differs from reproducible builder output: ' + file);
   }
 }
+
 console.log(
   JSON.stringify({
     name: manifest.name,
@@ -74,6 +76,6 @@ console.log(
     integrity,
     bytes: bytes.length,
     verified: true,
-    normalization: 'esbuild source-path comments only; declarations exact',
+    normalization: 'none; six dist files exact',
   }),
 );

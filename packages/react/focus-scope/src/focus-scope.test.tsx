@@ -297,6 +297,144 @@ describe('FocusScope', () => {
     });
   });
 
+  describe('given disabled fieldsets', () => {
+    it.each(['container', 'first'])(
+      'skips inherited disabled controls when reverse-tabbing from %s',
+      async (start) => {
+        const ref = React.createRef<HTMLDivElement>();
+        const rendered = render(
+          <FocusScope.Root ref={ref} loop trapped>
+            <button>First active</button>
+            <button>Last active</button>
+            <fieldset disabled>
+              <legend>Group</legend>
+              <input aria-label="Inherited disabled" />
+            </fieldset>
+          </FocusScope.Root>,
+        );
+        (start === 'container' ? ref.current : rendered.getByText('First active'))?.focus();
+
+        await userEvent.tab({ shift: true });
+        expect(rendered.getByText('Last active')).toHaveFocus();
+      },
+    );
+
+    it('retains the first legend exception but excludes explicitly disabled and inherited controls', async () => {
+      const ref = React.createRef<HTMLDivElement>();
+      const rendered = render(
+        <FocusScope.Root ref={ref} loop trapped>
+          <button>First active</button>
+          <fieldset disabled>
+            <legend>
+              <input aria-label="Legend active" />
+              <input aria-label="Legend explicitly disabled" disabled />
+            </legend>
+            <input aria-label="Inherited disabled" />
+          </fieldset>
+        </FocusScope.Root>,
+      );
+      ref.current?.focus();
+
+      await userEvent.tab({ shift: true });
+      expect(rendered.getByLabelText('Legend active')).toHaveFocus();
+      expect(rendered.getByLabelText('Legend explicitly disabled')).toBeDisabled();
+      expect(rendered.getByLabelText('Inherited disabled')).toBeDisabled();
+    });
+
+    it.each(['container', 'first'])(
+      'recomputes enabled fieldset edges after each transition from %s',
+      async (start) => {
+        const ref = React.createRef<HTMLDivElement>();
+        const fields = (disabled: boolean) => (
+          <FocusScope.Root ref={ref} loop trapped>
+            <button>First active</button>
+            <button>Last active</button>
+            <fieldset disabled={disabled}>
+              <legend>Group</legend>
+              <input aria-label="Group control" />
+            </fieldset>
+          </FocusScope.Root>
+        );
+        const rendered = render(fields(false));
+        (start === 'container' ? ref.current : rendered.getByText('First active'))?.focus();
+        await userEvent.tab({ shift: true });
+        expect(rendered.getByLabelText('Group control')).toHaveFocus();
+
+        rendered.rerender(fields(true));
+        (start === 'container' ? ref.current : rendered.getByText('First active'))?.focus();
+        await userEvent.tab({ shift: true });
+        expect(rendered.getByText('Last active')).toHaveFocus();
+
+        rendered.rerender(fields(false));
+        (start === 'container' ? ref.current : rendered.getByText('First active'))?.focus();
+        await userEvent.tab({ shift: true });
+        expect(rendered.getByLabelText('Group control')).toHaveFocus();
+      },
+    );
+
+    it('applies an outer disabled fieldset to a nested fieldset first legend', async () => {
+      const ref = React.createRef<HTMLDivElement>();
+      const rendered = render(
+        <FocusScope.Root ref={ref} loop trapped>
+          <button>First active</button>
+          <fieldset disabled>
+            <legend>
+              <input aria-label="Outer legend active" />
+            </legend>
+            <fieldset disabled>
+              <legend>
+                <input aria-label="Inner legend inherited disabled" />
+              </legend>
+              <input aria-label="Inner inherited disabled" />
+            </fieldset>
+          </fieldset>
+        </FocusScope.Root>,
+      );
+      ref.current?.focus();
+      await userEvent.tab({ shift: true });
+      expect(rendered.getByLabelText('Outer legend active')).toHaveFocus();
+    });
+
+    it('keeps links inside disabled fieldsets tabbable', async () => {
+      const ref = React.createRef<HTMLDivElement>();
+      const rendered = render(
+        <FocusScope.Root ref={ref} loop trapped>
+          <button>First active</button>
+          <fieldset disabled>
+            <legend>Group</legend>
+            <input aria-label="Inherited disabled" />
+            <a href="#destination">Enabled link</a>
+          </fieldset>
+        </FocusScope.Root>,
+      );
+      ref.current?.focus();
+      await userEvent.tab({ shift: true });
+      expect(rendered.getByText('Enabled link')).toHaveFocus();
+    });
+
+    it.each([
+      { isComposing: true },
+      { keyCode: 229 },
+      { altKey: true },
+      { ctrlKey: true },
+      { metaKey: true },
+    ])('does not intercept an IME or modified Tab from the container: %j', (keys) => {
+      const ref = React.createRef<HTMLDivElement>();
+      render(
+        <FocusScope.Root ref={ref} loop trapped>
+          <button>First active</button>
+          <fieldset disabled>
+            <input />
+          </fieldset>
+        </FocusScope.Root>,
+      );
+      ref.current?.focus();
+      const notCancelled = fireEvent.keyDown(ref.current!, { key: 'Tab', shiftKey: true, ...keys });
+      expect(notCancelled).toBe(true);
+      expect(ref.current).toHaveFocus();
+    });
+  });
+
   // Regression test for https://github.com/radix-ui/primitives/issues/3963
   describe('ref stability', () => {
     it('keeps a stable composed ref (no infinite render loop)', () => {

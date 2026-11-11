@@ -362,3 +362,76 @@ export const ContainerEntry = () => {
     </>
   );
 };
+
+export const FieldsetEntry = () => {
+  const [open, setOpen] = React.useState(false);
+  const [disabled, setDisabled] = React.useState(true);
+  const [legend, setLegend] = React.useState(false);
+  const [nested, setNested] = React.useState(false);
+  const [link, setLink] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+  return (
+    <>
+      <label>
+        <input
+          type="checkbox"
+          checked={legend}
+          onChange={(event) => setLegend(event.target.checked)}
+        />
+        Legend control
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          checked={nested}
+          onChange={(event) => setNested(event.target.checked)}
+        />
+        Nested fieldset
+      </label>
+      <label>
+        <input type="checkbox" checked={link} onChange={(event) => setLink(event.target.checked)} />
+        Link control
+      </label>
+      <button onClick={() => setOpen(true)}>Open fieldset scope</button>
+      {open && (
+        <FocusScope.Root
+          ref={ref}
+          data-testid="fieldset-scope"
+          loop
+          trapped
+          onMountAutoFocus={(event) => {
+            event.preventDefault();
+            ref.current?.focus();
+          }}
+        >
+          <button>First active</button>
+          <button onClick={() => setDisabled((value) => !value)}>
+            {disabled ? 'Enable fieldset' : 'Disable fieldset'}
+          </button>
+          <button>Last active</button>
+          <fieldset disabled={disabled}>
+            <legend>
+              Group{' '}
+              {legend && (
+                <>
+                  <input aria-label="Legend active" />
+                  <input disabled aria-label="Legend explicitly disabled" />
+                </>
+              )}
+            </legend>
+            <input aria-label="Group control" />
+            {nested && (
+              <fieldset disabled>
+                <legend>
+                  Inner <input aria-label="Inner legend control" />
+                </legend>
+                <input aria-label="Inner disabled control" />
+              </fieldset>
+            )}
+            {link && <a href="#destination">Enabled link</a>}
+          </fieldset>
+        </FocusScope.Root>
+      )}
+    </>
+  );
+};

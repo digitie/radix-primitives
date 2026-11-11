@@ -344,6 +344,28 @@ function getTabbableEdges(container: HTMLElement) {
 }
 
 /**
+ * Check native disabled state, including every disabled fieldset ancestor.
+ * The explicit ancestor check preserves each fieldset's first legend exception
+ * even in selector engines that only consider the nearest fieldset.
+ */
+function isDisabledFormControl(element: Element) {
+  if (element.matches(':disabled')) return true;
+  if (
+    element.namespaceURI !== 'http://www.w3.org/1999/xhtml' ||
+    !element.matches('button, input, select, textarea')
+  ) {
+    return false;
+  }
+  let fieldset = element.closest('fieldset[disabled]');
+  while (fieldset) {
+    const firstLegend = Array.from(fieldset.children).find((child) => child.tagName === 'LEGEND');
+    if (!firstLegend?.contains(element)) return true;
+    fieldset = fieldset.parentElement?.closest('fieldset[disabled]') ?? null;
+  }
+  return false;
+}
+
+/**
  * Returns a list of potential tabbable candidates.
  *
  * NOTE: This is only a close approximation. For example it doesn't take into account cases like when
@@ -360,7 +382,7 @@ function getTabbableCandidates(container: HTMLElement) {
     acceptNode: (node: Element) => {
       const isHiddenInput =
         node.tagName === 'INPUT' && (node as HTMLInputElement).type === 'hidden';
-      if ((node as HTMLInputElement).disabled || (node as HTMLElement).hidden || isHiddenInput) {
+      if (isDisabledFormControl(node) || (node as HTMLElement).hidden || isHiddenInput) {
         return NodeFilter.FILTER_SKIP;
       }
       // `.tabIndex` is not the same as the `tabindex` attribute. It works on the
