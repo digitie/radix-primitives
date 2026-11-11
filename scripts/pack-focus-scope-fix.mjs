@@ -20,8 +20,26 @@ const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
 }).trim();
 execFileSync(
   'git',
-  ['diff', '--exit-code', 'HEAD', '--', 'packages/react/focus-scope', 'internal/builder'],
+  [
+    'diff',
+    '--exit-code',
+    'HEAD',
+    '--',
+    'packages/react/focus-scope',
+    'internal/builder',
+    'scripts/pack-focus-scope-fix.mjs',
+  ],
   { cwd: root, stdio: 'inherit' },
+);
+// Always rebuild with the tracked original producer before copying dist.
+execFileSync(
+  'corepack',
+  ['pnpm', 'exec', 'node', 'internal/builder/radix-build.js', 'packages/react/focus-scope'],
+  {
+    cwd: root,
+    env: { ...process.env, pnpm_config_verify_deps_before_run: 'false' },
+    stdio: 'inherit',
+  },
 );
 const manifest = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
 if (
@@ -29,6 +47,26 @@ if (
   manifest.version !== '1.3.1+kortravel.fix.1'
 ) {
   throw new Error('Unexpected patched package identity');
+}
+// A frozen version is never re-created under the same name, even after CI-only
+// commits. Verify its original source/build and copy the single committed payload.
+const frozenRoot = path.join(root, 'patches/focus-scope-fix1');
+const frozenLedgerPath = path.join(frozenRoot, 'radix-focus-scope-artifact.json');
+if (fs.existsSync(frozenLedgerPath)) {
+  execFileSync(process.execPath, [path.join(root, 'scripts/verify-focus-scope-fix.mjs')], {
+    cwd: root,
+    stdio: 'inherit',
+  });
+  const frozen = JSON.parse(fs.readFileSync(frozenLedgerPath, 'utf8'));
+  const source = path.join(frozenRoot, frozen.filename);
+  const destination = path.join(output, frozen.filename);
+  if (fs.existsSync(destination) && !fs.readFileSync(destination).equals(fs.readFileSync(source))) {
+    throw new Error('Refusing to overwrite different bytes for a frozen version');
+  }
+  fs.copyFileSync(source, destination);
+  fs.copyFileSync(frozenLedgerPath, path.join(output, 'radix-focus-scope-artifact.json'));
+  console.log(JSON.stringify({ ...frozen, copiedFrozenArtifact: true }));
+  process.exit(0);
 }
 const stagingRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'radix-focus-scope-pack-'));
 const stage = path.join(stagingRoot, 'package');
@@ -128,6 +166,7 @@ const tar = execFileSync(
     '--owner=0',
     '--group=0',
     '--numeric-owner',
+    '--mode=u=rwX,go=rX',
     '-cf',
     '-',
     '-C',

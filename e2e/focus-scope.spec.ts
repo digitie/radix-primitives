@@ -3,7 +3,7 @@ import { visitStoryById } from './helpers';
 
 test.describe('FocusScope container entry', () => {
   test.beforeEach(async ({ page }) => {
-    await visitStoryById(page, 'utilities-focus-scope--container-entry');
+    await visitStoryById(page, 'utilities-focusscope--container-entry');
   });
 
   for (const loop of [false, true]) {

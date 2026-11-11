@@ -8,6 +8,8 @@ on:
       - 'apps/storybook/stories/focus-scope.stories.tsx'
       - 'e2e/focus-scope.spec.ts'
       - 'scripts/pack-focus-scope-fix.mjs'
+      - 'scripts/verify-focus-scope-fix.mjs'
+      - 'patches/focus-scope-fix1/**'
       - '.github/workflows/focus-scope-fix.yml'
   workflow_dispatch:
 permissions:
@@ -17,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -29,12 +33,13 @@ jobs:
       - run: pnpm exec vitest run packages/react/focus-scope --retry 0
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm exec playwright test e2e/focus-scope.spec.ts --workers=1
-      - run: node scripts/pack-focus-scope-fix.mjs /tmp/focus-scope-artifacts
+      - run: pnpm exec node internal/builder/radix-build.js packages/react/focus-scope
+      - run: node scripts/verify-focus-scope-fix.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: focus-scope-regression-and-package
           path: |
-            /tmp/focus-scope-artifacts
+            patches/focus-scope-fix1
             playwright-report
             test-results

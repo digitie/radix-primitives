@@ -1,0 +1,26 @@
+{
+  "sourceRepository": "https://github.com/digitie/radix-primitives",
+  "upstreamRepository": "https://github.com/radix-ui/primitives",
+  "upstreamCommit": "eb3a2b7091293e27df8f9ba906632d8daa3d81a3",
+  "upstreamPackage": {
+    "name": "@radix-ui/react-focus-scope",
+    "version": "1.3.1"
+  },
+  "patchedPackage": {
+    "name": "@radix-ui/react-focus-scope",
+    "version": "1.3.1+kortravel.fix.1"
+  },
+  "sourceCommit": "706e27aaf87bda2df7bbb9da60cc01cebc9ff064",
+  "license": "MIT",
+  "packageManager": "pnpm@11.5.0",
+  "sourceSha256": {
+    "src/index.ts": "2ccb67b49cdfb382f31511ffc4c7e312a6fad1483287d63831c4ac5027daca3d",
+    "src/focus-scope.tsx": "14cf3e40d2b97a6d2ab04bbcac56b5b7debaa3d24d7bee7a821b1beddfc93332",
+    "src/focus-scope.test.tsx": "16ce2c892cbd03a24b0ad7cc0f6e8d5fe1e2244941466a170828a8655ae7a939",
+    "tsconfig.json": "6dd4478cc31e52cc11b417074c9ff358b73690876faa7d79f791d45a55e3866d"
+  },
+  "filename": "radix-ui-react-focus-scope-1.3.1+kortravel.fix.1.tgz",
+  "bytes": 31214,
+  "integrity": "sha512-550B+tdvg3N/tsIzOFA8zRhoMxGnPeBRl65Wg+9kY2VEEf6TW7RZKBWckVToLNuALHYZR8J9zG8GUP7DROBflg==",
+  "sha256": "f97c1dd4851fd1dc7b75bfbe9ce7e2d68bbd32e225b9ff52954c683fd4c7081d"
+}
