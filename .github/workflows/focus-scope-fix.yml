@@ -37,8 +37,8 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm exec playwright test e2e/focus-scope.spec.ts e2e/focus-scope-fieldset.spec.ts --workers=1
       - run: pnpm --filter @radix-ui/react-focus-scope build
-      - name: Create the explicit new-version candidate before freezing
-        run: node scripts/create-focus-scope-fix.mjs /tmp/focus-scope-fix2-artifacts
+      - name: Verify and copy the single frozen fix.2 payload
+        run: node scripts/pack-focus-scope-fix.mjs /tmp/focus-scope-fix2-artifacts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
