@@ -1,6 +1,7 @@
 // @ts-check
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -29,7 +30,9 @@ if (
 ) {
   throw new Error('Unexpected patched package identity');
 }
-const stage = fs.mkdtempSync(path.join(os.tmpdir(), 'radix-focus-scope-pack-'));
+const stagingRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'radix-focus-scope-pack-'));
+const stage = path.join(stagingRoot, 'package');
+fs.mkdirSync(stage);
 for (const item of ['dist', 'src', 'README.md', 'tsconfig.json']) {
   fs.cpSync(path.join(packageRoot, item), path.join(stage, item), {
     recursive: true,
@@ -110,11 +113,36 @@ const tarball = path.join(output, filename);
 if (fs.existsSync(tarball)) {
   throw new Error('Refusing to overwrite an existing candidate tarball');
 }
-execFileSync('corepack', ['pnpm', 'pack', '--out', tarball], {
-  cwd: stage,
-  env: { ...process.env, pnpm_config_verify_deps_before_run: 'false' },
-  stdio: 'inherit',
-});
+// pnpm's manifest normalizer strips semver build metadata, so archive the verified
+// publish manifest directly. Dependencies are still installed and built using pnpm.
+for (const file of ['dist/index.js', 'dist/index.mjs', 'dist/index.d.ts', 'dist/index.d.mts']) {
+  if (!fs.existsSync(path.join(stage, file))) {
+    throw new Error('Missing public export target: ' + file);
+  }
+}
+const tar = execFileSync(
+  'tar',
+  [
+    '--sort=name',
+    '--mtime=@0',
+    '--owner=0',
+    '--group=0',
+    '--numeric-owner',
+    '-cf',
+    '-',
+    '-C',
+    stagingRoot,
+    'package',
+  ],
+  { maxBuffer: 4 * 1024 * 1024 },
+);
+fs.writeFileSync(tarball, gzipSync(tar));
+const packedManifest = JSON.parse(
+  execFileSync('tar', ['-xOzf', tarball, 'package/package.json'], { encoding: 'utf8' }),
+);
+if (packedManifest.name !== manifest.name || packedManifest.version !== manifest.version) {
+  throw new Error('Packed package identity differs from source');
+}
 const bytes = fs.readFileSync(tarball);
 const result = {
   ...provenance,
